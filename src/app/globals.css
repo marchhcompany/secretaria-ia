@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+/* Identidade March Company: preto, laranja da marca e branco. Tema escuro único. */
+:root {
+  --bg: #0a0a0a;
+  --surface: #131211;
+  --surface-2: #1b1917;
+  --ink: #f6f3ef;
+  --muted: #a39b93;
+  --line: #2a2522;
+  --accent: #fd5401;
+  --accent-soft: #2b1608;
+  --on-accent: #140803;
+  --warm: #f2b33d;
+  --warm-soft: #2e2410;
+  --danger: #ff7a6b;
+  --danger-soft: #34160f;
+  --success: #5fd38d;
+  --success-soft: #11291b;
+  --chat-bg: #0e0d0c;
+  --bubble-in: #1f1d1b;
+  --bubble-out: #3a1906;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-warm: var(--warm);
+  --color-warm-soft: var(--warm-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-chat: var(--chat-bg);
+  --color-bubble-in: var(--bubble-in);
+  --color-bubble-out: var(--bubble-out);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-[15px] text-ink outline-none placeholder:text-muted/70 focus:border-accent focus:ring-2 focus:ring-accent/25;
+  }
+  .label {
+    @apply grid gap-1.5 text-sm font-medium text-ink;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-bold text-on-accent transition hover:brightness-110 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-sm font-medium text-ink transition hover:border-accent focus-visible:outline-2 focus-visible:outline-accent;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-danger transition hover:bg-danger-soft;
+  }
+  .card {
+    @apply rounded-xl border border-line bg-surface p-5;
+  }
+  .h1 {
+    @apply font-display text-2xl font-extrabold tracking-tight;
+  }
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-accent;
+  }
+}
+
+/* Linha de luz da marca */
+.glow-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent) 50%, transparent);
+  position: relative;
+}
+.glow-line::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 90px;
+  height: 6px;
+  translate: -50% -50%;
+  border-radius: 999px;
+  background: var(--accent);
+  filter: blur(6px);
+  opacity: 0.9;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 0.35s ease-out both;
+}
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+@keyframes sweep {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(220%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
+  * {
+    scroll-behavior: auto !important;
+  }
+}
