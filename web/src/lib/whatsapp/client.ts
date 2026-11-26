@@ -133,11 +133,16 @@ export type StatusUpdate = {
   errors?: { code?: number; title?: string; message?: string }[];
 };
 
+// Coexistência: mensagens que a equipe envia pelo app WhatsApp Business do celular
+// chegam como "echo" (campo smb_message_echoes). `to` é o cliente.
+export type MessageEcho = { from?: string; to?: string; id: string; type?: string; timestamp?: string; text?: { body?: string } };
+
 export type WebhookValue = {
   metadata?: { phone_number_id?: string; display_phone_number?: string };
   contacts?: { wa_id?: string; profile?: { name?: string } }[];
   messages?: InboundMessage[];
   statuses?: StatusUpdate[];
+  message_echoes?: MessageEcho[];
 };
 
 export type WebhookPayload = {

@@ -7,10 +7,14 @@ const LINKS = [
   { href: "/painel", label: "Visão geral" },
   { href: "/painel/agenda", label: "Agenda" },
   { href: "/painel/conversas", label: "Conversas" },
+  { href: "/painel/leads", label: "Leads" },
   { href: "/painel/simulador", label: "Testar assistente" },
-  { href: "/painel/servicos", label: "Serviços" },
-  { href: "/painel/horarios", label: "Horários e equipe" },
   { href: "/painel/assistente", label: "Assistente" },
+  { href: "/painel/servicos", label: "Serviços" },
+  { href: "/painel/horarios", label: "Horários e profissionais" },
+  { href: "/painel/automacoes", label: "Automações" },
+  { href: "/painel/custos", label: "Custos" },
+  { href: "/painel/equipe", label: "Empresas e equipe" },
 ];
 
 export function Nav({ attention }: { attention: number }) {

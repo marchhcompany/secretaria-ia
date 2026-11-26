@@ -383,3 +383,33 @@ async function processWebhookNoReply(phoneNumberId: string, texts: string[]) {
   if (!conv) [conv] = await db.insert(conversations).values({ businessId: b.id, customerId: c.id }).returning();
   for (const t of texts) await addCustomerMessage(conv.id, t, new Date(Date.now() + texts.indexOf(t)));
 }
+
+describe("coexistência (app do celular + API)", () => {
+  test("resposta da equipe pelo celular pausa a IA e entra no histórico como Equipe", async () => {
+    const b = await makeBusiness();
+    useScripted([say("Oi! Como posso ajudar?")]);
+    await processWebhook(inbound(b.whatsappPhoneNumberId!, PHONE, "Oi"));
+    await processWebhook({
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          changes: [
+            {
+              field: "smb_message_echoes",
+              value: {
+                metadata: { phone_number_id: b.whatsappPhoneNumberId! },
+                message_echoes: [{ from: "552130000000", to: PHONE, id: "wamid.ECHO1", type: "text", text: { body: "Oi, aqui é o Kauã!" } }],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const { conversation } = await conversationOf(b.id, PHONE);
+    assert.equal(conversation.mode, "human");
+    const staffMsgs = await db.select().from(messages).where(and(eq(messages.conversationId, conversation.id), eq(messages.role, "staff")));
+    assert.equal(staffMsgs[0].content, "Oi, aqui é o Kauã!");
+    await processWebhook(inbound(b.whatsappPhoneNumberId!, PHONE, "Beleza"));
+    assert.equal(model.calls.length, 1, "a IA não responde depois que a equipe assumiu pelo celular");
+  });
+});

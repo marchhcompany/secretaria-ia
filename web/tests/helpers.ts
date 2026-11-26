@@ -54,8 +54,8 @@ export function useScriptedModel(steps: Step[]) {
 export function userTextOf(params: CreateParams): string {
   return params.messages
     .filter((m) => m.role === "user")
-    .flatMap((m) => (Array.isArray(m.content) ? m.content : [{ type: "text", text: m.content }]))
-    .map((b) => ("text" in b ? b.text : ""))
+    .flatMap((m): unknown[] => (Array.isArray(m.content) ? m.content : [{ type: "text", text: m.content }]))
+    .map((b) => (b && typeof b === "object" && "text" in b ? String(b.text) : ""))
     .join("\n");
 }
 

@@ -11,6 +11,7 @@ import {
   messageText,
   sendText,
   type InboundMessage,
+  type MessageEcho,
   type Sender,
   type StatusUpdate,
   type WebhookPayload,
@@ -30,9 +31,15 @@ export async function processWebhook(payload: WebhookPayload) {
   if (payload.object !== "whatsapp_business_account") return;
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
-      if (change.field !== "messages") continue;
       const phoneNumberId = change.value?.metadata?.phone_number_id;
       if (!phoneNumberId) continue;
+      if (change.field === "smb_message_echoes") {
+        for (const echo of change.value?.message_echoes ?? []) {
+          await processEcho(phoneNumberId, echo).catch((err) => console.error("[whatsapp] echo", echo.id, err));
+        }
+        continue;
+      }
+      if (change.field !== "messages") continue;
       const profileName = change.value?.contacts?.[0]?.profile?.name ?? "";
       for (const status of change.value?.statuses ?? []) {
         await processStatus(phoneNumberId, status).catch((err) => console.error("[whatsapp] status", status.id, err));
@@ -66,6 +73,52 @@ async function processStatus(phoneNumberId: string, status: StatusUpdate) {
     const reason = status.errors?.[0]?.message ?? status.errors?.[0]?.title ?? "motivo não informado";
     await flag(business, msg.conversationId, `Uma mensagem não foi entregue pelo WhatsApp: ${reason}`);
   }
+}
+
+/**
+ * Coexistência: alguém da equipe respondeu pelo app do celular. Registra no histórico como "Equipe"
+ * e pausa a IA nesta conversa, para ela nunca responder junto com a pessoa.
+ */
+async function processEcho(phoneNumberId: string, echo: MessageEcho) {
+  const business = await businessByPhone(phoneNumberId);
+  if (!business || !echo.id || !echo.to) return;
+  const fresh = await db
+    .insert(whatsappInbound)
+    .values({ id: echo.id, businessId: business.id })
+    .onConflictDoNothing()
+    .returning({ id: whatsappInbound.id });
+  if (!fresh.length) return;
+  // Mensagens que a própria API enviou (IA/painel) já estão registradas.
+  const [known] = await db.select({ id: messages.id }).from(messages).where(and(eq(messages.waMessageId, echo.id), eq(messages.businessId, business.id)));
+  if (known) return;
+  const phone = echo.to.replace(/\D/g, "");
+  const [customer] = await db
+    .insert(customers)
+    .values({ businessId: business.id, phone })
+    .onConflictDoUpdate({ target: [customers.businessId, customers.phone], set: { phone } })
+    .returning();
+  const conversationId = await currentConversation(business.id, customer.id);
+  const at = echo.timestamp ? new Date(Number(echo.timestamp) * 1000) : new Date();
+  await db.insert(messages).values({
+    businessId: business.id,
+    conversationId,
+    role: "staff",
+    content: echo.text?.body?.trim() || `[A equipe enviou ${describeKind(echo.type ?? "")} pelo celular]`,
+    source: "whatsapp_app",
+    deliveryStatus: "sent",
+    waMessageId: echo.id,
+    createdAt: at,
+  });
+  const [conv] = await db.select({ mode: conversations.mode }).from(conversations).where(eq(conversations.id, conversationId));
+  await db.update(conversations).set({ mode: "human", needsAttention: false, lastMessageAt: at }).where(eq(conversations.id, conversationId));
+  if (conv?.mode !== "human")
+    await db.insert(messages).values({
+      businessId: business.id,
+      conversationId,
+      role: "system",
+      content: "A equipe respondeu pelo celular. A IA foi pausada nesta conversa.",
+      createdAt: new Date(at.getTime() + 1),
+    });
 }
 
 async function processMessage(phoneNumberId: string, message: InboundMessage, profileName: string) {

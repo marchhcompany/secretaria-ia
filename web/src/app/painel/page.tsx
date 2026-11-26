@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { and, count, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
-import { appointments, businessHours, conversations, services } from "@/db/schema";
+import { appointments, businessHours, conversations, customers, faqs, services } from "@/db/schema";
+import { monthSpendMicroUsd } from "@/lib/assistant/engine";
+import { modelConfigured } from "@/lib/assistant/model";
 import { requireBusiness } from "@/lib/business";
 import { appointmentList } from "@/lib/queries";
 import { daysAgo, formatLong } from "@/lib/time";
@@ -14,7 +16,7 @@ export default async function VisaoGeral() {
   const now = daysAgo(0);
   const total = (q: Promise<{ n: number }[]>) => q.then((r) => r[0]?.n ?? 0);
 
-  const [upcoming, convCount, assistantCount, attention, serviceCount, hourCount] = await Promise.all([
+  const [upcoming, convCount, assistantCount, attention, serviceCount, hourCount, hotLeads, kbCount, spent] = await Promise.all([
     appointmentList(business.id, { from: now, active: true, limit: 8 }),
     total(
       db
@@ -43,19 +45,31 @@ export default async function VisaoGeral() {
         .where(and(eq(services.businessId, business.id), eq(services.active, true))),
     ),
     total(db.select({ n: count() }).from(businessHours).where(eq(businessHours.businessId, business.id))),
+    total(
+      db
+        .select({ n: count() })
+        .from(customers)
+        .where(and(eq(customers.businessId, business.id), eq(customers.interest, "quente"), gte(customers.lastInboundAt, since))),
+    ),
+    total(db.select({ n: count() }).from(faqs).where(eq(faqs.businessId, business.id))),
+    monthSpendMicroUsd(business.id),
   ]);
 
   const stats = [
     { value: convCount, label: "conversas (30 dias)" },
     { value: assistantCount, label: "agendamentos feitos pela assistente (30 dias)" },
     { value: attention, label: "conversas esperando a equipe" },
+    { value: hotLeads, label: "leads quentes (30 dias)" },
+    { value: `US$ ${(spent / 1e6).toFixed(2)}`, label: "custo de IA no mês" },
   ];
 
   const setup = [
     { done: serviceCount > 0, label: "Cadastrar serviços e preços", href: "/painel/servicos" },
     { done: hourCount > 0, label: "Definir horários de funcionamento", href: "/painel/horarios" },
     { done: !!business.about, label: "Descrever o negócio para a assistente", href: "/painel/assistente" },
-    { done: !!process.env.ANTHROPIC_API_KEY, label: "Ativar a inteligência artificial (chave da API)", href: "/painel/simulador" },
+    { done: kbCount > 0, label: "Preencher a base de conhecimento", href: "/painel/assistente" },
+    { done: !!business.conversionGoal, label: "Definir objetivo e regras comerciais", href: "/painel/assistente" },
+    { done: modelConfigured(), label: "Ativar a inteligência artificial (chave da API)", href: "/painel/simulador" },
     { done: !!business.whatsappPhoneNumberId, label: "Conectar o WhatsApp", href: "/painel/assistente" },
   ];
 
@@ -63,7 +77,7 @@ export default async function VisaoGeral() {
     <>
       <PageHeader title="Visão geral" />
 
-      <div className="mb-6 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => (
           <div key={s.label} className="grid gap-1 bg-surface p-4">
             <b className="font-display text-3xl tabular-nums">{s.value}</b>

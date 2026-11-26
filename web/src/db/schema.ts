@@ -55,6 +55,8 @@ export const businesses = pgTable("businesses", {
   aiMonthlyBudgetCents: integer("ai_monthly_budget_cents").notNull().default(0),
   // Trava de segurança: enquanto false, automações só simulam (dry-run) e nada é enviado.
   automationsLive: boolean("automations_live").notNull().default(false),
+  // Divide respostas em até 3 mensagens (mais natural). Cada mensagem pode ser cobrada pela Meta.
+  splitReplies: boolean("split_replies").notNull().default(true),
   // E-mail(s) que recebem aviso quando uma conversa precisa da equipe. Vazio: e-mail dos donos.
   notifyEmails: text("notify_emails").notNull().default(""),
   createdAt: createdAt(),

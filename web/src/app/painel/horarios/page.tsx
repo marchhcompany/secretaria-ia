@@ -18,7 +18,7 @@ export default async function HorariosPage() {
 
   return (
     <>
-      <PageHeader title="Horários e equipe">
+      <PageHeader title="Horários e profissionais">
         A assistente só oferece horários dentro do funcionamento. Use o segundo intervalo para quem fecha no almoço.
       </PageHeader>
 

@@ -127,6 +127,7 @@ export async function saveAssistant(form: FormData) {
       conversionGoal: text(form, "conversion_goal"),
       qualificationQuestions: text(form, "qualification_questions"),
       hidePrices: form.get("hide_prices") === "on",
+      splitReplies: form.get("split_replies") === "on",
       aiEnabled: form.get("ai_enabled") === "on",
       bookingMode,
       aiModel: text(form, "ai_model"),

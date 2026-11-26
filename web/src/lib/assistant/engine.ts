@@ -219,6 +219,8 @@ export async function runAssistant(conversationId: string): Promise<AssistantOut
         max_tokens: 8000,
         ...fallbackParams(model),
         output_config: { effort: "low" },
+        // Cache automático do histórico: cada nova mensagem relê o histórico do cache (~10% do preço).
+        cache_control: { type: "ephemeral" },
         system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
         tools,
         messages: transcript,
@@ -277,7 +279,7 @@ export async function runAssistant(conversationId: string): Promise<AssistantOut
     })
     .where(eq(conversations.id, conversationId));
   await markHandled();
-  const parts = await insertReply(business, conversationId, splitReply(reply), "ai");
+  const parts = await insertReply(business, conversationId, business.splitReplies ? splitReply(reply) : [reply], "ai");
   return { status: "replied", text: reply, parts, handoff };
 }
 

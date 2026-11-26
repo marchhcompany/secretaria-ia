@@ -35,7 +35,9 @@ export function buildSystemPrompt(ctx: BusinessContext): string {
     .map((s) => (direct ? `- ${s.name} (id: ${s.id})` : `- ${s.name}`))
     .join("\n");
 
-  const hourLines = WEEKDAYS.map((day, i) => {
+  const hourLines = !hours.length
+    ? "(não cadastrado: se perguntarem, diga que a equipe confirma os horários)"
+    : WEEKDAYS.map((day, i) => {
     const ranges = hours
       .filter((h) => h.weekday === i)
       .sort((a, b) => a.opens.localeCompare(b.opens))

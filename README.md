@@ -1,6 +1,15 @@
-# Secretária IA
+# March Assistente (Secretária IA)
 
-Assistente de atendimento com IA no WhatsApp para pequenos negócios (clínicas, salões, estúdios). Ela responde clientes 24h, consulta horários livres, agenda, cancela e passa a conversa para uma pessoa da equipe quando não sabe responder.
+Assistente de atendimento e pré-venda com IA no WhatsApp para negócios locais. Ela responde clientes 24h, qualifica interessados, segue as regras comerciais de cada empresa, agenda (ou registra pedidos de horário), faz follow-up e passa a conversa para uma pessoa da equipe quando precisa.
+
+Documentação do estado atual e próximos passos:
+
+- [Auditoria técnica e o que foi feito](docs/auditoria.md)
+- [WhatsApp oficial: passo a passo na Meta, coexistência e Embedded Signup](docs/whatsapp-meta.md)
+- [Custos por cliente e viabilidade do plano de R$ 500](docs/custos.md)
+- [Plano de testes](docs/plano-de-testes.md)
+- [Demonstração WS Training Studio](docs/demo-ws-training-studio.md)
+- [Integração futura com o CRM March](docs/crm-integracao.md)
 
 Produto da [March Company](https://marchcompany.com.br), em operação para clientes reais.
 
@@ -59,6 +68,27 @@ cp .env.example .env.local   # preencha as variáveis
 npm install
 npm run db:migrate
 npm run dev
+```
+
+Testes (Postgres local com o banco `secretaria_test`, usuário/senha `app`; nenhuma chamada paga, nenhum WhatsApp real):
+
+```bash
+cd web
+npm test
+```
+
+Configurar a March Company como primeira empresa (depois de criar a conta em `/criar-conta`):
+
+```bash
+cd web
+npm run seed:march -- seu@email.com
+```
+
+Avaliar a IA com o modelo real (gasta centavos de crédito da Anthropic):
+
+```bash
+cd web
+npm run eval -- "March Company"
 ```
 
 Variáveis necessárias estão em `web/.env.example` (banco, autenticação, chave da Anthropic e credenciais do WhatsApp). Nenhuma chave real é versionada.
