@@ -44,13 +44,15 @@ export function Chat({
       const outcome = await sendSimulatorMessage(conversationId, text);
       if (outcome.status === "replied") {
         if (outcome.handoff) push("system", "A assistente passou a conversa para a equipe.");
-        push("assistant", outcome.text);
+        for (const part of outcome.parts) push("assistant", part.text);
       } else if (outcome.status === "human") {
         setNotice("Esta conversa está com a equipe, então a assistente não responde. Comece uma nova conversa para testar de novo.");
+      } else if (outcome.status === "disabled") {
+        setNotice("A IA está desligada para este negócio (Assistente → IA ligada).");
       } else if (outcome.status === "not_configured") {
         setNotice("A assistente ainda não está ativada (falta a chave da API).");
-      } else {
-        setNotice(outcome.message);
+      } else if (outcome.status === "error" || outcome.status === "blocked") {
+        setNotice(`A assistente não respondeu: ${outcome.message} No WhatsApp, o cliente receberia um aviso de que a equipe vai responder.`);
       }
     });
   }
