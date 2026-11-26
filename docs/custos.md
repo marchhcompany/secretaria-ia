@@ -48,6 +48,9 @@ transcrição custa na faixa de centavos por minuto e exige outro fornecedor.
 
 Com só **um** cliente, a infraestrutura inteira (≈ R$ 243/mês) fica com ele.
 
+> **Atualização (26/11/2026):** o padrão do sistema passou a ser `anthropic:claude-haiku-5-5` e há suporte a OpenAI, Gemini, Groq e
+> OpenRouter. Comparação e custo por atendimento de cada um em `provedores-ia.md`.
+
 ## Conclusões
 
 1. **R$ 500/mês é saudável até ~300 conversas/mês com Sonnet 5.5 ou ~800 com Haiku 5.5.** Com Opus 5.5 (o padrão atual do sistema),

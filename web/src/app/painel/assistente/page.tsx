@@ -1,17 +1,23 @@
 ﻿import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { faqs as faqTable } from "@/db/schema";
-import { DEFAULT_MODEL } from "@/lib/assistant/model";
+import { MODELS, defaultModelSpec, priceOf, providerFor } from "@/lib/ai";
 import { requireBusiness } from "@/lib/business";
 import { addFaq, removeFaq, saveAssistant, saveWhatsapp } from "../actions";
 import { PageHeader } from "../ui";
 
-const MODELS = [
-  { value: "", label: `Padrão do servidor (${DEFAULT_MODEL})` },
-  { value: "claude-opus-5-5", label: "Claude Opus 5.5 · melhor qualidade" },
-  { value: "claude-sonnet-5-5", label: "Claude Sonnet 5.5 · equilíbrio" },
-  { value: "claude-haiku-5-5", label: "Claude Haiku 5.5 · mais barato (testar antes)" },
-];
+function modelOptions(current: string) {
+  const def = defaultModelSpec();
+  const label = (spec: string) => {
+    const p = priceOf(spec);
+    const ready = providerFor(spec).provider.configured() ? "" : " · sem chave configurada";
+    const source = p.priceSource === "confirmed" ? "" : " (preço a confirmar)";
+    return `${p.label} · US$ ${p.input}/${p.output} por 1M tokens${source}${ready}`;
+  };
+  const opts = [{ value: "", label: `Padrão do servidor: ${label(def)}` }, ...MODELS.map((m) => ({ value: m.spec, label: label(m.spec) }))];
+  if (current && !opts.some((o) => o.value === current)) opts.push({ value: current, label: current });
+  return opts;
+}
 
 export default async function AssistentePage({ searchParams }: PageProps<"/painel/assistente">) {
   const { business, role } = await requireBusiness();
@@ -131,7 +137,7 @@ export default async function AssistentePage({ searchParams }: PageProps<"/paine
           <label className="label">
             Modelo de IA
             <select id="model" name="ai_model" defaultValue={business.aiModel} className="input">
-              {MODELS.map((m) => (
+              {modelOptions(business.aiModel).map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
                 </option>

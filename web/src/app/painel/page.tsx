@@ -3,7 +3,7 @@ import { and, count, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
 import { appointments, businessHours, conversations, customers, faqs, services } from "@/db/schema";
 import { monthSpendMicroUsd } from "@/lib/assistant/engine";
-import { modelConfigured } from "@/lib/assistant/model";
+import { modelSpecFor, providerFor } from "@/lib/ai";
 import { requireBusiness } from "@/lib/business";
 import { appointmentList } from "@/lib/queries";
 import { daysAgo, formatLong } from "@/lib/time";
@@ -69,7 +69,7 @@ export default async function VisaoGeral() {
     { done: !!business.about, label: "Descrever o negócio para a assistente", href: "/painel/assistente" },
     { done: kbCount > 0, label: "Preencher a base de conhecimento", href: "/painel/assistente" },
     { done: !!business.conversionGoal, label: "Definir objetivo e regras comerciais", href: "/painel/assistente" },
-    { done: modelConfigured(), label: "Ativar a inteligência artificial (chave da API)", href: "/painel/simulador" },
+    { done: providerFor(modelSpecFor(business)).provider.configured(), label: "Ativar a inteligência artificial (chave do provedor)", href: "/painel/simulador" },
     { done: !!business.whatsappPhoneNumberId, label: "Conectar o WhatsApp", href: "/painel/assistente" },
   ];
 

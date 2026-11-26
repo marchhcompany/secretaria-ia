@@ -22,6 +22,7 @@ import {
   staff,
   user as userTable,
 } from "@/db/schema";
+import { normalizeSpec } from "@/lib/ai";
 import { addCustomerMessage, runAssistant, type AssistantOutcome } from "@/lib/assistant/engine";
 import { optOut } from "@/lib/assistant/tools";
 import {
@@ -45,6 +46,15 @@ function parsePrice(raw: string): number | null {
   if (!raw) return null;
   const n = Number(raw.replace(/\./g, "").replace(",", "."));
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
+}
+
+function validModel(raw: string): string {
+  if (!raw) return "";
+  try {
+    return normalizeSpec(raw);
+  } catch {
+    return "";
+  }
 }
 
 // ---------- Serviços ----------
@@ -130,7 +140,7 @@ export async function saveAssistant(form: FormData) {
       splitReplies: form.get("split_replies") === "on",
       aiEnabled: form.get("ai_enabled") === "on",
       bookingMode,
-      aiModel: text(form, "ai_model"),
+      aiModel: validModel(text(form, "ai_model")),
       aiMonthlyBudgetCents: budget,
       notifyEmails: text(form, "notify_emails"),
     })

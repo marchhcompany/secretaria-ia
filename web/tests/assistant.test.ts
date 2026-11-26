@@ -413,3 +413,88 @@ describe("coexistência (app do celular + API)", () => {
     assert.equal(model.calls.length, 1, "a IA não responde depois que a equipe assumiu pelo celular");
   });
 });
+
+describe("provedores de IA (arquitetura independente)", () => {
+  test("provedor compatível com OpenAI: ferramenta, resposta e custo registrado", async () => {
+    const { setCompatClient } = await import("@/lib/ai/compat");
+    const bodies: unknown[] = [];
+    const replies = [
+      { tool_calls: [{ id: "c1", type: "function", function: { name: "atualizar_lead", arguments: JSON.stringify({ nome: "Bia", tipo_negocio: "academia", necessidade: "atendimento", interesse: "morno", etapa: "qualificando", resumo: "Academia quer IA." }) } }] },
+      { content: "Oi, Bia! Sou a assistente virtual da March Company. Como funciona o atendimento hoje?" },
+    ];
+    setCompatClient({
+      async create(kind, body) {
+        assert.equal(kind, "gemini");
+        bodies.push(structuredClone(body));
+        const msg = replies.shift()!;
+        return {
+          id: "x",
+          object: "chat.completion",
+          created: 0,
+          model: "gemini-2.5-flash",
+          choices: [{ index: 0, finish_reason: msg.tool_calls ? "tool_calls" : "stop", logprobs: null, message: { role: "assistant", content: msg.content ?? null, refusal: null, tool_calls: msg.tool_calls as never } }],
+          usage: { prompt_tokens: 1200, completion_tokens: 80, total_tokens: 1280, prompt_tokens_details: { cached_tokens: 1000 } },
+        } as never;
+      },
+    });
+    const b = await makeBusiness({ aiModel: "gemini:gemini-2.5-flash" });
+    useScripted([]);
+    await processWebhook(inbound(b.whatsappPhoneNumberId!, PHONE, "Oi, tenho uma academia"));
+    setCompatClient(null);
+    assert.equal(model.calls.length, 0, "a Anthropic não é chamada");
+    assert.deepEqual(outgoingTexts(), ["Oi, Bia! Sou a assistente virtual da March Company. Como funciona o atendimento hoje?"]);
+    const { customer, conversation } = await conversationOf(b.id, PHONE);
+    assert.equal(customer.businessType, "academia");
+    assert.equal(conversation.transcriptProvider, "gemini");
+    // Tipos união viram string para Gemini; o resultado da ferramenta volta como mensagem "tool".
+    const second = bodies[1] as { messages: { role: string }[] };
+    assert.ok(second.messages.some((m) => m.role === "tool"));
+    const usage = await db.select().from(aiUsage).where(eq(aiUsage.businessId, b.id));
+    assert.equal(usage[0].model, "gemini:gemini-2.5-flash");
+    assert.equal(usage[0].cacheReadTokens, 1000);
+    assert.ok(usage[0].costMicroUsd > 0);
+  });
+
+  test("trocar de provedor no meio da conversa reconstrói o histórico em texto", async () => {
+    const { setCompatClient } = await import("@/lib/ai/compat");
+    const b = await makeBusiness();
+    useScripted([say("Oi! Qual é o seu negócio?")]);
+    await processWebhook(inbound(b.whatsappPhoneNumberId!, PHONE, "Oi"));
+    const { businesses: bt } = await import("@/db/schema");
+    await db.update(bt).set({ aiModel: "groq:openai/gpt-oss-120b" }).where(eq(bt.id, b.id));
+    let sent: { messages: { role: string; content: unknown }[] } | null = null;
+    setCompatClient({
+      async create(_kind, body) {
+        sent = structuredClone(body) as never;
+        return { id: "y", object: "chat.completion", created: 0, model: "openai/gpt-oss-120b", choices: [{ index: 0, finish_reason: "stop", logprobs: null, message: { role: "assistant", content: "Legal!", refusal: null } }], usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 } } as never;
+      },
+    });
+    await processWebhook(inbound(b.whatsappPhoneNumberId!, PHONE, "Tenho uma pizzaria"));
+    setCompatClient(null);
+    const roles = sent!.messages.map((m) => m.role);
+    assert.deepEqual(roles, ["system", "user", "assistant", "user"]);
+    assert.equal(sent!.messages[2].content, "Oi! Qual é o seu negócio?");
+  });
+
+  test("'cancelar' sozinho não é descadastro", () => {
+    assert.ok(!isOptOutRequest("cancelar"));
+    assert.ok(isOptOutRequest("PARAR"));
+  });
+});
+
+describe("alertas", () => {
+  test("conversa com a equipe gera um alerta só, não um por mensagem", async () => {
+    const b = await makeBusiness({ notifyEmails: "equipe@march.test" });
+    useScripted([call("chamar_atendente", { motivo: "pediu humano" }), say("Já chamei a equipe!")]);
+    const warns: string[] = [];
+    const orig = console.warn;
+    console.warn = (...a: unknown[]) => void warns.push(String(a[0]));
+    try {
+      await processWebhook(inbound(b.whatsappPhoneNumberId!, PHONE, "Quero falar com uma pessoa"));
+      for (const t of ["Oi?", "Alguém?", "Olá"]) await processWebhook(inbound(b.whatsappPhoneNumberId!, PHONE, t));
+    } finally {
+      console.warn = orig;
+    }
+    assert.equal(warns.filter((w) => w.includes("[email não enviado")).length, 1);
+  });
+});

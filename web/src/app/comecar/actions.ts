@@ -18,7 +18,8 @@ export async function createBusiness(_: CreateState, form: FormData): Promise<Cr
   if (!name) return { error: "Informe o nome do negócio." };
 
   await db.transaction(async (tx) => {
-    const [business] = await tx.insert(businesses).values({ name, segment }).returning({ id: businesses.id });
+    // Teto inicial de IA (US$ 5/mês) para conta nova: evita custo surpresa. O dono ajusta em Assistente.
+    const [business] = await tx.insert(businesses).values({ name, segment, aiMonthlyBudgetCents: 500 }).returning({ id: businesses.id });
     await tx.insert(businessMembers).values({ businessId: business.id, userId: user.id, role: "owner" });
     await tx.insert(services).values(SERVICE_TEMPLATES[segment].map((s) => ({ ...s, businessId: business.id })));
     await tx.insert(businessHours).values(DEFAULT_HOURS.map((h) => ({ ...h, businessId: business.id })));

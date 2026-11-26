@@ -1,0 +1,1 @@
+ALTER TABLE "conversations" ADD COLUMN "transcript_provider" text DEFAULT 'anthropic' NOT NULL;

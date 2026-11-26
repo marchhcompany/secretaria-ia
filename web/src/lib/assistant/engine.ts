@@ -1,5 +1,5 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import { APIError, AuthenticationError, RateLimitError } from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { and, asc, eq, gt, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -15,7 +15,7 @@ import {
   type Business,
 } from "@/db/schema";
 import { formatLong } from "@/lib/time";
-import { DEFAULT_MODEL, costMicroUsd, fallbackParams, modelClient, modelConfigured, usageOf } from "./model";
+import { costMicroUsd, modelSpecFor, providerFor, type HistoryItem, type StepResult, type ToolResult } from "@/lib/ai";
 import { buildSystemPrompt, canBookDirectly } from "./prompt";
 import { optOut, runTool, toolsFor } from "./tools";
 
@@ -56,7 +56,7 @@ export async function addCustomerMessage(conversationId: string, content: string
 
 // Pedidos explícitos de descadastro: tratados sem depender da IA (funcionam mesmo com a IA fora do ar).
 const OPT_OUT = [
-  /^\s*(parar|pare|sair|stop|descadastrar|cancelar)\s*[.!]*\s*$/i,
+  /^\s*(parar|pare|sair|stop|descadastrar)\s*[.!]*\s*$/i,
   /n[ãa]o\s+(quero|desejo)\s+(mais\s+)?receber/i,
   /pare[m]?\s+de\s+(me\s+)?(mandar|enviar)/i,
   /n[ãa]o\s+me\s+(mande[m]?|envie[m]?)\s+mais/i,
@@ -89,7 +89,7 @@ export function splitReply(text: string): string[] {
  * O histórico enviado à API (`conversations.transcript`) só cresce: nunca é editado,
  * para manter válidos os blocos de raciocínio do modelo entre as mensagens.
  */
-export async function runAssistant(conversationId: string): Promise<AssistantOutcome> {
+export async function runAssistant(conversationId: string, opts: { modelSpec?: string } = {}): Promise<AssistantOutcome> {
   const [conversation] = await db.select().from(conversations).where(eq(conversations.id, conversationId));
   if (!conversation) return { status: "error", message: "Conversa não encontrada." };
   const businessId = conversation.businessId;
@@ -142,7 +142,7 @@ export async function runAssistant(conversationId: string): Promise<AssistantOut
     await db.update(conversations).set({ needsAttention: true }).where(eq(conversations.id, conversationId));
     return { status: "disabled" };
   }
-  if (!modelConfigured()) return { status: "not_configured" };
+  const { provider, model, spec } = providerFor(opts.modelSpec || modelSpecFor(business));
 
   const blocked = await usageBlock(business, conversationId, now);
   if (blocked) {
@@ -168,29 +168,49 @@ export async function runAssistant(conversationId: string): Promise<AssistantOut
     )
     .orderBy(asc(messages.createdAt));
 
-  const transcript = conversation.transcript as Anthropic.Beta.BetaMessageParam[];
+  // Histórico no formato do provedor atual. Se o negócio trocou de provedor, reconstrói a partir das mensagens.
+  const transcript: unknown[] =
+    conversation.transcriptProvider === provider.kind
+      ? (conversation.transcript as unknown[])
+      : provider.rebuild(await historyOf(conversationId, pending.map((m) => m.id)));
   const baseLength = transcript.length;
   const known = customer.name ? ` Cliente: ${customer.name}.` : " Cliente ainda sem nome cadastrado.";
-  const userBlocks: Anthropic.Beta.BetaTextBlockParam[] = [];
+  const userTexts: string[] = [];
   if (staffSince.length)
-    userBlocks.push({
-      type: "text",
-      text: `[A equipe escreveu para o cliente enquanto você estava pausada:\n${staffSince.map((s) => `- ${s.content}`).join("\n")}]`,
-    });
-  userBlocks.push({
-    type: "text",
-    text: `[Recebida em ${formatLong(pending.at(-1)!.createdAt, business.timezone)}.${known}${
+    userTexts.push(`[A equipe escreveu para o cliente enquanto você estava pausada:\n${staffSince.map((s) => `- ${s.content}`).join("\n")}]`);
+  userTexts.push(
+    `[Recebida em ${formatLong(pending.at(-1)!.createdAt, business.timezone)}.${known}${
       pending.length > 1 ? ` O cliente mandou ${pending.length} mensagens seguidas; responda todas juntas.` : ""
     }]`,
-  });
-  for (const m of pending) userBlocks.push({ type: "text", text: m.content });
-  transcript.push({ role: "user", content: userBlocks });
+  );
+  for (const m of pending) userTexts.push(m.content);
+  provider.addUser(transcript, userTexts);
+
+  // Sem chave do provedor: guarda a mensagem no histórico (a próxima resposta a considera) e avisa a equipe.
+  const saveUserTurnOnly = async () => {
+    transcript.length = baseLength;
+    provider.addUser(transcript, userTexts);
+    await db
+      .update(conversations)
+      .set({ transcript, transcriptProvider: provider.kind, aiContextUntil: now, needsAttention: true })
+      .where(eq(conversations.id, conversationId));
+    await markHandled();
+  };
+  if (!provider.configured()) {
+    await saveUserTurnOnly();
+    await db.insert(messages).values({
+      businessId,
+      conversationId,
+      role: "system",
+      content: `A assistente não respondeu: falta a chave do provedor de IA (${provider.kind}).`,
+    });
+    return { status: "not_configured" };
+  }
 
   const ctx = { business, services: serviceRows, staff: staffRows, hours: hourRows, faqs: faqRows };
   const directBooking = canBookDirectly(ctx);
   const system = buildSystemPrompt(ctx);
   const tools = toolsFor(directBooking, business.bookingMode);
-  const model = business.aiModel || DEFAULT_MODEL;
 
   let handoff = false;
   let attention: string | null = null;
@@ -209,59 +229,34 @@ export async function runAssistant(conversationId: string): Promise<AssistantOut
     },
   };
 
-  const client = modelClient();
   let reply = "";
 
   try {
     for (let step = 0; step < MAX_STEPS; step++) {
-      const response = await client.create({
-        model,
-        max_tokens: 8000,
-        ...fallbackParams(model),
-        output_config: { effort: "low" },
-        // Cache automático do histórico: cada nova mensagem relê o histórico do cache (~10% do preço).
-        cache_control: { type: "ephemeral" },
-        system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-        tools,
-        messages: transcript,
-      });
-      await recordUsage(businessId, conversationId, response, model);
-      transcript.push({ role: "assistant", content: response.content });
+      const r: StepResult = await provider.step({ model, system, tools, transcript });
+      await recordUsage(businessId, conversationId, spec, r);
 
-      if (response.stop_reason === "refusal") {
+      if (r.refused) {
         reply = "Vou pedir para alguém da equipe te responder, tudo bem? Já já falam com você.";
         await runTool("chamar_atendente", { motivo: "A assistente não conseguiu responder a esta mensagem." }, toolCtx);
         break;
       }
-      if (response.stop_reason === "pause_turn") continue;
-
-      const toolUses = response.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
-      if (response.stop_reason !== "tool_use" || toolUses.length === 0) {
-        reply = response.content
-          .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
-          .map((b) => b.text)
-          .join("\n")
-          .trim();
+      if (r.pause) continue;
+      if (!r.toolCalls.length) {
+        reply = r.text;
         break;
       }
-
-      const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
-      for (const use of toolUses) {
-        const r = await runTool(use.name, (use.input ?? {}) as Record<string, unknown>, toolCtx);
-        results.push({ type: "tool_result", tool_use_id: use.id, content: r.content, is_error: r.isError });
+      const results: ToolResult[] = [];
+      for (const call of r.toolCalls) {
+        const out = await runTool(call.name, call.input, toolCtx);
+        results.push({ id: call.id, content: out.content, isError: out.isError });
       }
-      transcript.push({ role: "user", content: results });
+      provider.addToolResults(transcript, results);
     }
   } catch (err) {
     // Falha da IA: guarda só a mensagem do cliente no histórico (sem a volta incompleta),
     // para a próxima resposta já levar em conta o que ele escreveu.
-    transcript.length = baseLength;
-    transcript.push({ role: "user", content: userBlocks });
-    await db
-      .update(conversations)
-      .set({ transcript, aiContextUntil: now, needsAttention: true })
-      .where(eq(conversations.id, conversationId));
-    await markHandled();
+    await saveUserTurnOnly();
     const message = describeError(err);
     await db.insert(messages).values({ businessId, conversationId, role: "system", content: `A assistente não respondeu: ${message}` });
     return { status: "error", message };
@@ -273,6 +268,7 @@ export async function runAssistant(conversationId: string): Promise<AssistantOut
     .update(conversations)
     .set({
       transcript,
+      transcriptProvider: provider.kind,
       lastMessageAt: new Date(),
       aiContextUntil: now,
       ...(attention ? { needsAttention: true, handoffReason: attention } : {}),
@@ -323,24 +319,45 @@ async function usageBlock(business: Business, conversationId: string, now: Date)
   return null;
 }
 
-async function recordUsage(businessId: string, conversationId: string, response: Anthropic.Beta.BetaMessage, requested: string) {
-  const usage = usageOf(response);
-  const model = response.model || requested;
+async function recordUsage(businessId: string, conversationId: string, spec: string, r: StepResult) {
+  // Em fallback, o modelo que respondeu pode ser outro: cobra pelo que respondeu.
+  const served = r.servedModel.includes(":") ? r.servedModel : `${spec.split(":")[0]}:${r.servedModel}`;
   await db.insert(aiUsage).values({
     businessId,
     conversationId,
-    model,
-    inputTokens: usage.input,
-    outputTokens: usage.output,
-    cacheReadTokens: usage.cacheRead,
-    cacheWriteTokens: usage.cacheWrite,
-    costMicroUsd: costMicroUsd(model, usage),
+    model: served,
+    inputTokens: r.usage.input,
+    outputTokens: r.usage.output,
+    cacheReadTokens: r.usage.cacheRead,
+    cacheWriteTokens: r.usage.cacheWrite,
+    costMicroUsd: costMicroUsd(served, r.usage),
   });
 }
 
+/** Histórico em texto (para trocar de provedor no meio de uma conversa). */
+async function historyOf(conversationId: string, excludeIds: string[]): Promise<HistoryItem[]> {
+  const rows = await db
+    .select({ id: messages.id, role: messages.role, content: messages.content })
+    .from(messages)
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy(asc(messages.createdAt));
+  const items: HistoryItem[] = [];
+  for (const m of rows) {
+    if (excludeIds.includes(m.id) || m.role === "system") continue;
+    const role = m.role === "customer" ? "user" : "assistant";
+    const text = m.role === "staff" ? `[Equipe] ${m.content}` : m.content;
+    const last = items.at(-1);
+    if (last?.role === role) last.text += `\n${text}`;
+    else items.push({ role, text });
+  }
+  // A conversa precisa começar pelo cliente.
+  while (items[0]?.role === "assistant") items.shift();
+  return items;
+}
+
 function describeError(err: unknown): string {
-  if (err instanceof AuthenticationError) return "chave da Anthropic inválida.";
-  if (err instanceof RateLimitError) return "limite de uso da Anthropic atingido. Tente de novo em instantes.";
-  if (err instanceof APIError) return `erro da API da Anthropic (${err.status ?? "sem status"}).`;
+  if (err instanceof AuthenticationError || err instanceof OpenAI.AuthenticationError) return "chave do provedor de IA inválida.";
+  if (err instanceof RateLimitError || err instanceof OpenAI.RateLimitError) return "limite de uso do provedor de IA atingido. Tente de novo em instantes.";
+  if (err instanceof APIError || err instanceof OpenAI.APIError) return `erro da API do provedor de IA (${err.status ?? "sem status"}).`;
   return `falha inesperada (${(err as Error)?.message ?? "erro desconhecido"}).`;
 }

@@ -29,9 +29,10 @@ que só deve ser feita com sua autorização explícita.
 - **Janela de atendimento (24 h)**: depois de cada mensagem do cliente, o negócio pode responder com texto livre por 24 h. Fora dela, só
   **templates aprovados** (marketing, utilidade ou autenticação). A March Assistente bloqueia texto livre fora da janela.
 
-## Preços (Brasil) **(confirmar)**
+## Preços (Brasil): NÃO CONFIRMADOS por fonte oficial
 
-Segundo a página de preços da Meta (via busca) e parceiros, a partir de **01/10/2026**:
+Os itens abaixo vêm de resultados de busca que citam a página de preços da Meta e de blogs de parceiros. Não consegui abrir a página
+oficial. **Não use estes valores em proposta comercial antes de conferir no Gerenciador do WhatsApp.** Segundo essas fontes, a partir de **01/10/2026**:
 
 - Marketing: **R$ 0,3217** por mensagem entregue.
 - Utilidade e autenticação: **R$ 0,035**.
@@ -56,36 +57,54 @@ assistente ao negócio de cada cliente. Há investigações de órgãos de conco
 - Vazão: ~80 mensagens/segundo por número (coexistência: menor, 5–20 msg/s, **confirmar**).
 - Sem verificação empresarial: até 2 números por portfolio.
 
-## Opção A · Número de teste da Meta (fazer agora)
+## Opção A · Número de teste da Meta (guia prático)
 
-O que você faz (eu não tenho acesso à sua conta da Meta):
+> Os nomes de botões abaixo seguem a interface da Meta como eu a conheço; a documentação oficial estava bloqueada neste ambiente, então
+> **os rótulos exatos não foram confirmados** e podem estar em português ou inglês, com pequenas diferenças. A sequência é a mesma.
 
-1. Em **business.facebook.com**, confirme que existe o portfolio "March Company" e que você é administrador.
-2. Em **developers.facebook.com** → *Meus apps* → *Criar app* → caso de uso **"Conectar-se com clientes pelo WhatsApp"**, ligado ao portfolio da March.
-3. No app, **WhatsApp → Configuração da API**: a Meta cria um número de teste e uma WABA de teste.
-   - Anote o **Phone Number ID** e o **WhatsApp Business Account ID**.
-   - Em *Para*, cadastre até 5 celulares que vão testar (o seu, o do Kauã…). Cada um confirma por código.
-4. **Configurações do app → Básico**: copie o **App Secret**.
-5. **Token permanente**: Configurações do negócio → *Usuários do sistema* → criar usuário (Admin) → *Adicionar ativos*: o app e a WABA
-   (controle total) → *Gerar token* com `whatsapp_business_messaging` e `whatsapp_business_management`.
-   **Não cole o token em chats**: coloque direto nas variáveis da Vercel.
-6. Na **Vercel** (projeto da March Assistente), defina:
-   - `WHATSAPP_APP_SECRET` = App Secret
-   - `WHATSAPP_VERIFY_TOKEN` = um texto aleatório que você inventa
-   - `WHATSAPP_ACCESS_TOKEN` = token do usuário do sistema
-   - `DATA_ENCRYPTION_KEY` = texto aleatório com 40+ caracteres (cifra tokens de clientes)
-   - `CRON_SECRET` = texto aleatório (protege o processamento de automações)
-   - `ANTHROPIC_API_KEY` (já deve existir) e, opcional, `RESEND_API_KEY` + `EMAIL_FROM` para os alertas por e-mail
-7. **Antes do deploy desta versão**, aplique as migrations no banco de produção: `cd web && npm run db:migrate` com o `DATABASE_URL` de produção
-   no `.env.local` (apenas adiciona colunas e tabelas). Depois faça o deploy (merge na `main`).
-8. No app da Meta, **WhatsApp → Configuração → Webhook**: URL `https://SEU-DOMINIO/api/whatsapp`, token = o mesmo `WHATSAPP_VERIFY_TOKEN`.
-   Clique em verificar e **assine o campo `messages`**.
-9. No painel da March Assistente: crie sua conta, rode `npm run seed:march -- seu@email` (ou configure pela tela), revise tudo em
-   *Assistente*, teste no *Testar assistente* e só então preencha o **Phone Number ID** e o **WABA ID** em *Assistente → WhatsApp*.
-10. Do celular cadastrado, mande mensagem para o número de teste e siga o roteiro de `plano-de-testes.md` (parte "ponta a ponta").
+### Credenciais: teste x produção
 
-Validação de verdade = a resposta chega no celular **e** aparece no painel como "entregue/lida" (status vindo do webhook da Meta), não apenas
-um 200 na requisição.
+| Credencial | Para que serve | Teste (hoje) | Produção |
+|---|---|---|---|
+| Token de acesso | Enviar mensagens | **Token temporário** da tela *Configuração da API* (expira em ~24 h) | **Token de usuário do sistema** (não expira), com `whatsapp_business_messaging` e `whatsapp_business_management` |
+| Phone Number ID | Saber de qual número é cada mensagem | ID do número de teste | ID do número definitivo |
+| WABA ID | Templates e cobrança | WABA de teste criada pela Meta | WABA definitiva |
+| App Secret | Conferir a assinatura dos webhooks | O mesmo nos dois | O mesmo |
+| Verify token | Confirmar o webhook | Você inventa | Você inventa |
+
+O token temporário serve para o primeiro teste. Para a demonstração à WS, troque pelo token de usuário do sistema (passo 11).
+
+### Passos
+
+1. **Conta**: use o Facebook pessoal que é administrador do portfolio da March em business.facebook.com.
+2. Abra **developers.facebook.com** → *Meus apps* → **Criar app**.
+3. Caso de uso: **"Conectar-se com clientes pelo WhatsApp"** (em inglês, "Connect with customers through WhatsApp"). Se pedir o tipo,
+   escolha **Empresa / Business**. Nome do app: "March Assistente". Portfolio: **March Company**.
+4. No painel do app, abra **WhatsApp → Configuração da API** ("API Setup"). A Meta cria um **número de teste** e uma WABA de teste.
+   Aparecem: o número de teste (campo *De/From*), o **Phone Number ID** e o **WhatsApp Business Account ID**.
+5. No campo **Para/To**, clique em *Gerenciar lista de números* e **adicione o seu celular** (a Meta permite poucos destinatários no
+   número de teste, normalmente 5). Você recebe um código no WhatsApp para confirmar.
+6. Ainda nessa tela, clique em **Enviar mensagem**: chega no seu celular o template `hello_world`. Isso prova que o app envia.
+7. **Configurações do app → Básico** → *Chave secreta do app* ("App Secret") → *Mostrar*.
+8. Na **Vercel**, coloque as variáveis no ambiente **Production** (marcadas como *Sensitive*): `WHATSAPP_ACCESS_TOKEN`,
+   `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` e as do `deploy-checklist.md`. **Não cole tokens no chat**, nem os envie para mim.
+9. **WhatsApp → Configuração** ("Configuration") → *Webhook* → **Editar**: URL de callback `https://<domínio>/api/whatsapp`, token de
+   verificação = o mesmo `WHATSAPP_VERIFY_TOKEN` → **Verificar e salvar**. Depois, em *Campos do webhook*, **assine `messages`**.
+10. No painel da March Assistente → *Assistente → WhatsApp*: preencha o Phone Number ID e o WABA ID → *Salvar WhatsApp*.
+11. Produção: business.facebook.com → **Configurações do negócio → Usuários do sistema** → *Adicionar* (função Admin) → *Atribuir
+    ativos*: o app e a WABA, com controle total → **Gerar novo token** → app "March Assistente", validade *Nunca*, permissões
+    `whatsapp_business_messaging` e `whatsapp_business_management` → copie direto para `WHATSAPP_ACCESS_TOKEN` na Vercel e faça redeploy.
+12. Do seu celular, mande "Oi" para o número de teste. A resposta da assistente deve chegar e aparecer no painel como *entregue/lida*.
+
+Validação de verdade = a resposta chega no celular **e** o painel mostra o status *entregue/lida* vindo do webhook da Meta. Um 200 na
+requisição não basta.
+
+### Não confirmado (documentação oficial inacessível neste ambiente)
+
+- Rótulos exatos dos botões e o limite exato de destinatários do número de teste.
+- Se as mensagens do número de teste são gratuitas.
+- Os preços por categoria no Brasil (seção "Preços" acima) e a cobrança de mensagens de atendimento desde 01/10/2026.
+- Todas as regras de coexistência (opção C), inclusive disponibilidade no Brasil.
 
 ## Opção B · Número novo dedicado (recomendado para a demonstração)
 
@@ -96,9 +115,10 @@ um 200 na requisição.
 5. Inicie a **verificação empresarial** do portfolio (CNPJ, comprovante, domínio marchcompany.com.br). Ela libera limites maiores e é pré-requisito para a opção C e para vender a clientes.
 6. Troque o Phone Number ID no painel. O número de teste pode continuar existindo.
 
-## Opção C · Coexistência com o WhatsApp Business do celular
+## Opção C · Coexistência com o WhatsApp Business do celular (regras NÃO CONFIRMADAS por fonte oficial)
 
-Permite usar a API e o app **no mesmo número**, mantendo o app e o histórico. O que a Meta e os parceiros documentam:
+Permite usar a API e o app **no mesmo número**, mantendo o app e o histórico. O que aparece em trechos de busca da página da Meta e em
+documentação de parceiros (360dialog, Telnyx); trate tudo como **a confirmar**:
 
 - É feito pelo **Embedded Signup** com a opção de coexistência (ou seja, por um app de **Tech Provider** ou por um **parceiro BSP**).
   Não há confirmação oficial de que uma empresa consiga fazer isso sozinha com o próprio app sem ser Tech Provider **(confirmar)**.

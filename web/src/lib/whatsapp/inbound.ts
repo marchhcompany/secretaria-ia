@@ -164,27 +164,38 @@ async function processMessage(phoneNumberId: string, message: InboundMessage, pr
 /** Roda a assistente (uma por vez por conversa) e entrega a resposta pelo WhatsApp. */
 export async function respond(business: Business, conversationId: string, phone: string): Promise<AssistantOutcome> {
   return withConversationLock(conversationId, async () => {
+    const attentionBefore = await needsAttention(conversationId);
     const outcome = await runAssistant(conversationId);
     if (outcome.status === "replied") {
       await deliver(business, conversationId, phone, outcome.parts, outcome.handoff);
-      if (outcome.handoff) await notifyTeam(business, conversationId, "A assistente passou a conversa para a equipe.");
-      else {
+      if (!outcome.handoff) {
         const [conv] = await db.select().from(conversations).where(eq(conversations.id, conversationId));
         const [customer] = await db.select().from(customers).where(eq(customers.id, conv.customerId));
         await scheduleFollowUp(business, customer, conversationId);
-        if (conv.needsAttention) await notifyTeam(business, conversationId, conv.handoffReason || "A conversa precisa da equipe.");
       }
     } else if (outcome.status === "error" || outcome.status === "not_configured" || outcome.status === "blocked") {
-      const why =
-        outcome.status === "not_configured" ? "A assistente não respondeu: falta a chave da Anthropic." : `A assistente não respondeu: ${outcome.message}`;
-      if (outcome.status === "not_configured") await flag(business, conversationId, why);
       await sendHolding(business, conversationId, phone);
+    }
+    // Um e-mail só quando a conversa passa a precisar da equipe (não a cada mensagem).
+    if (!attentionBefore && (await needsAttention(conversationId))) {
+      const [conv] = await db.select({ reason: conversations.handoffReason }).from(conversations).where(eq(conversations.id, conversationId));
+      const why =
+        outcome.status === "not_configured"
+          ? "A assistente não respondeu: falta a chave do provedor de IA."
+          : outcome.status === "error" || outcome.status === "blocked"
+            ? `A assistente não respondeu: ${outcome.message}`
+            : outcome.status === "human" || outcome.status === "disabled"
+              ? "Nova mensagem do cliente em uma conversa com a equipe."
+              : conv?.reason || "A conversa precisa da equipe.";
       await notifyTeam(business, conversationId, why);
-    } else if (outcome.status === "human" || outcome.status === "disabled") {
-      await notifyTeam(business, conversationId, "Nova mensagem do cliente em uma conversa com a equipe.");
     }
     return outcome;
   });
+}
+
+async function needsAttention(conversationId: string) {
+  const [c] = await db.select({ v: conversations.needsAttention }).from(conversations).where(eq(conversations.id, conversationId));
+  return !!c?.v;
 }
 
 /**

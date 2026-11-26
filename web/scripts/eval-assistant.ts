@@ -1,9 +1,12 @@
-// Avaliação da assistente com o modelo REAL (gasta créditos da Anthropic: ~US$ 0,02–0,10 por cenário com Opus).
-// Roda conversas de teste no canal "simulador" (nada vai para o WhatsApp) e confere regras objetivas.
-// Uso: npm run eval -- "March Company"
+// Avaliação da assistente com o modelo REAL. Roda conversas de teste no canal "simulador"
+// (nada vai para o WhatsApp) e confere regras objetivas. Os textos são fictícios (nenhum dado real de cliente).
+//
+// Sem --confirmar, só mostra a estimativa de custo e não chama nenhum modelo.
+// Uso: npm run eval -- "March Company" anthropic:claude-haiku-5-5 [--confirmar] [--cenarios=1,3]
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { aiUsage, businesses, conversations, customers, messages } from "@/db/schema";
+import { normalizeSpec, priceOf, providerFor } from "@/lib/ai";
 import { addCustomerMessage, runAssistant } from "@/lib/assistant/engine";
 
 type Check = [string, (reply: string, ctx: { handoff: boolean; status: string }) => boolean];
@@ -77,16 +80,38 @@ const SCENARIOS: Scenario[] = [
   },
 ];
 
+// Premissas da estimativa: ~1,5 chamada por mensagem do cliente; 6.000 tokens de entrada (prompt + histórico,
+// sem contar desconto de cache) e 400 de saída por chamada. Arredondado para cima de propósito.
+export function estimateUsd(spec: string, turns: number) {
+  const p = priceOf(spec);
+  const calls = Math.ceil(turns * 1.5);
+  return (calls * (6000 * p.input + 400 * p.output)) / 1e6;
+}
+
 async function main() {
-  if (!process.env.ANTHROPIC_API_KEY) throw new Error("Defina ANTHROPIC_API_KEY no .env.local (este teste usa o modelo real e gera custo).");
-  const name = process.argv[2] ?? "March Company";
+  const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+  const flags = process.argv.slice(2).filter((a) => a.startsWith("--"));
+  const name = args[0] ?? "March Company";
+  const spec = normalizeSpec(args[1] ?? "anthropic:claude-haiku-5-5");
+  const only = flags.find((f) => f.startsWith("--cenarios="))?.split("=")[1].split(",");
+  const scenarios = SCENARIOS.filter((x) => !only || only.includes(x.id));
+  const turns = scenarios.reduce((n, s) => n + s.turns.length, 0);
+  const est = estimateUsd(spec, turns);
+  const p = priceOf(spec);
+  console.log(`Modelo: ${spec} (${p.label}; preço ${p.priceSource === "confirmed" ? "oficial" : "de fonte secundária"})`);
+  console.log(`${scenarios.length} cenários, ${turns} mensagens. Custo estimado: até US$ ${est.toFixed(3)} (≈ R$ ${(est * 5.4).toFixed(2)}).`);
+  if (!flags.includes("--confirmar")) {
+    console.log("Nada foi chamado. Para executar de verdade, rode de novo com --confirmar.");
+    process.exit(0);
+  }
+  const { provider } = providerFor(spec);
+  if (!provider.configured()) throw new Error(`Falta a chave do provedor ${provider.kind} no .env.local.`);
   const [business] = await db.select().from(businesses).where(eq(businesses.name, name));
   if (!business) throw new Error(`Empresa "${name}" não encontrada. Rode o seed antes.`);
-  const only = process.argv[3]?.split(",");
 
   let pass = 0;
   let total = 0;
-  for (const s of SCENARIOS.filter((x) => !only || only.includes(x.id))) {
+  for (const s of scenarios) {
     const [customer] = await db.insert(customers).values({ businessId: business.id, phone: `simulador-eval-${Date.now()}-${s.id}` }).returning();
     const [conv] = await db.insert(conversations).values({ businessId: business.id, customerId: customer.id, channel: "simulator" }).returning();
     console.log(`\n=== Cenário ${s.id}: ${s.title}`);
@@ -97,7 +122,7 @@ async function main() {
       console.log(`CLIENTE: ${turn}`);
       await addCustomerMessage(conv.id, turn);
       const t0 = Date.now();
-      const out = await runAssistant(conv.id);
+      const out = await runAssistant(conv.id, { modelSpec: spec });
       status = out.status;
       if (out.status === "replied") {
         last = out.text;

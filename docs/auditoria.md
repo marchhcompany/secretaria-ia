@@ -103,3 +103,25 @@ Ver `custos.md`. Em resumo: a IA com Opus 5.5 custa cerca de US$ 0,16 por conver
 ## 4. Testes
 
 `cd web && npm test` roda 23 testes de integração com Postgres real, modelo roteirizado e WhatsApp falso (sem custo e sem envio real). Ver `plano-de-testes.md`.
+
+## 5. Revisão de segurança da PR (26/11/2026)
+
+Revisão do diff completo contra a `main`.
+
+| Área | Verificação | Resultado |
+|---|---|---|
+| Autenticação | Painel protegido por sessão (`requireBusiness` em toda página e ação); `proxy.ts` só faz o redirecionamento rápido | OK |
+| Cadastro | Era aberto: qualquer pessoa podia criar conta e gastar IA no simulador | **Corrigido**: `SIGNUP_ALLOWED_EMAILS` (validado no banco, vale até para chamadas diretas à API; testado via HTTP) e teto inicial de US$ 5/mês para empresas novas |
+| Permissões | Configurações, base de conhecimento, WhatsApp, automações e equipe exigem papel de dono; atender conversas e editar leads, papel de equipe | OK |
+| Isolamento | Toda consulta do painel filtra pelo `business.id` da sessão; o webhook resolve a empresa pelo Phone Number ID; as ferramentas da IA só alcançam o cliente da conversa; os status de entrega são filtrados por empresa; a troca de empresa valida a participação | OK (testes de isolamento) |
+| Webhook | HMAC SHA-256 com comparação em tempo constante sobre o corpo bruto; GET de verificação com token; deduplicação por `wamid` | OK (testado via HTTP: 401 com assinatura inválida, duplicata ignorada) |
+| Cron | `Authorization: Bearer CRON_SECRET` com comparação em tempo constante; sem segredo, endpoint desligado | OK |
+| Segredos | Tokens de clientes cifrados com AES-256-GCM (`DATA_ENCRYPTION_KEY`); nenhum segredo no repositório (`.env.test` só tem valores falsos) | OK |
+| Concorrência | Trava por conversa no Postgres (`pg_advisory_xact_lock`), funciona entre instâncias; resposta descartada se a equipe assumir no meio | OK (testes) |
+| Custos | Teto mensal por empresa, limite de 40 respostas por conversa a cada 24 h, custo por chamada registrado | OK (testes) |
+| Alertas | Cada mensagem de cliente em conversa já com a equipe gerava um novo e-mail | **Corrigido**: um alerta por transição (testado) |
+| Descadastro | A palavra "cancelar" sozinha era tratada como descadastro ("cancelar meu horário") | **Corrigido** (testado) |
+| IA sem chave | Mensagens ficavam pendentes e seriam respondidas em bloco dias depois | **Corrigido**: entram no histórico e a conversa vai para a equipe |
+| Injeção de prompt | O cliente pode tentar instruir a IA ("ignore as regras") | Risco residual: o prompt não tem dados de outras empresas e as ferramentas só agem no próprio cliente, então o pior caso é uma resposta fora das regras, visível no painel |
+| Reprocessamento | Se o servidor cair entre a deduplicação e a resposta, a mensagem não é reprocessada | Risco residual conhecido (baixo volume); a mensagem fica visível no painel |
+| Força bruta no login | Limite de tentativas padrão do Better Auth | Não revisado a fundo |

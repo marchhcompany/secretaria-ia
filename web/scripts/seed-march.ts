@@ -78,6 +78,7 @@ async function main() {
     bookingMode: "request" as const,
     aiEnabled: true,
     automationsLive: false,
+    aiMonthlyBudgetCents: 2000, // US$ 20/mês durante a validação
   };
 
   const [existing] = await db

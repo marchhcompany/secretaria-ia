@@ -49,7 +49,7 @@ export const businesses = pgTable("businesses", {
   qualificationQuestions: text("qualification_questions").notNull().default(""),
   // direct: a IA agenda sozinha na agenda real. request: só registra a preferência e chama a equipe. off: não agenda.
   bookingMode: text("booking_mode", { enum: ["direct", "request", "off"] }).notNull().default("direct"),
-  // Modelo da Anthropic deste negócio. Vazio: ANTHROPIC_MODEL do servidor.
+  // Modelo de IA deste negócio, "provedor:modelo" (ex.: anthropic:claude-haiku-5-5). Vazio: AI_MODEL do servidor.
   aiModel: text("ai_model").notNull().default(""),
   // Teto mensal de gasto com IA, em centavos de dólar. 0 = sem teto.
   aiMonthlyBudgetCents: integer("ai_monthly_budget_cents").notNull().default(0),
@@ -221,6 +221,8 @@ export const conversations = pgTable(
     needsAttention: boolean("needs_attention").notNull().default(false),
     // Histórico enviado à API da Anthropic. Só cresce: nunca editar entradas antigas.
     transcript: jsonb("transcript").$type<unknown[]>().notNull().default([]),
+    // Formato do transcript (cada provedor de IA tem o seu). Trocar de provedor reconstrói a partir das mensagens.
+    transcriptProvider: text("transcript_provider").notNull().default("anthropic"),
     // Resumo atualizado pela própria assistente (ferramenta atualizar_lead).
     summary: text("summary").notNull().default(""),
     handoffReason: text("handoff_reason").notNull().default(""),

@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { cancelAllForCustomer, cancelAppointmentReminders, scheduleAppointmentReminder } from "@/lib/automations";
 import { book, freeSlots } from "@/lib/scheduling";
+import type { ToolDef } from "@/lib/ai";
 import { formatLong } from "@/lib/time";
 
 type Tool = Anthropic.Beta.BetaTool;
@@ -135,11 +136,10 @@ const COMMON_TOOLS: Tool[] = [
   },
 ];
 
-/** Ferramentas disponíveis para este negócio. A lista é estável por negócio (mantém o cache do prompt). */
-export function toolsFor(directBooking: boolean, bookingMode: Business["bookingMode"]): Tool[] {
-  if (directBooking) return [...BOOKING_TOOLS, ...COMMON_TOOLS];
-  if (bookingMode === "request") return [REQUEST_TOOL, ...COMMON_TOOLS];
-  return COMMON_TOOLS;
+/** Ferramentas disponíveis para este negócio, em formato neutro. A lista é estável por negócio (mantém o cache do prompt). */
+export function toolsFor(directBooking: boolean, bookingMode: Business["bookingMode"]): ToolDef[] {
+  const list = directBooking ? [...BOOKING_TOOLS, ...COMMON_TOOLS] : bookingMode === "request" ? [REQUEST_TOOL, ...COMMON_TOOLS] : COMMON_TOOLS;
+  return list.map((t) => ({ name: t.name, description: t.description ?? "", parameters: t.input_schema as Record<string, unknown> }));
 }
 
 export type ToolContext = {
