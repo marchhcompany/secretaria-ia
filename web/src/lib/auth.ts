@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { db } from "@/db";
@@ -22,6 +23,22 @@ export const auth = betterAuth({
     sendResetPassword: async ({ user, token }) => {
       const mail = resetPasswordEmail(user.name, `${appURL}/redefinir-senha?token=${encodeURIComponent(token)}`);
       await sendEmail(user.email, mail.subject, mail.html, mail.text);
+    },
+  },
+  // Cadastro restrito durante a validação: só e-mails da lista SIGNUP_ALLOWED_EMAILS (separados por vírgula).
+  // Vazio = cadastro aberto. Fica no banco de dados (hook), então vale também para chamadas diretas à API.
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (u) => {
+          const allowed = (process.env.SIGNUP_ALLOWED_EMAILS ?? "")
+            .split(/[,;\s]+/)
+            .map((e) => e.trim().toLowerCase())
+            .filter(Boolean);
+          if (allowed.length && !allowed.includes(u.email.toLowerCase()))
+            throw new APIError("FORBIDDEN", { message: "Cadastro fechado. Peça acesso à March Company." });
+        },
+      },
     },
   },
   plugins: [nextCookies()],

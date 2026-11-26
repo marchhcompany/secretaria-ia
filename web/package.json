@@ -8,13 +8,18 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs migrate"
+    "db:migrate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs migrate",
+    "test": "node --env-file=.env.test --import tsx --test --test-concurrency=1 tests/*.test.ts",
+    "eval": "node --env-file=.env.local --import tsx scripts/eval-assistant.ts",
+    "seed:march": "node --env-file=.env.local --import tsx scripts/seed-march.ts",
+    "seed:demo-academia": "node --env-file=.env.local --import tsx scripts/seed-demo-academia.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
     "better-auth": "^1.7.7",
     "drizzle-orm": "^0.45.3",
     "next": "16.3.8",
+    "openai": "^7.65.0",
     "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8"

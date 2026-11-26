@@ -8,6 +8,7 @@ export const SEGMENTS: { value: string; label: string }[] = [
   { value: "salao", label: "Salão de beleza" },
   { value: "saude", label: "Clínica ou consultório de saúde" },
   { value: "fitness", label: "Estúdio de pilates, yoga ou academia" },
+  { value: "servicos", label: "Agência, tecnologia ou serviços para empresas" },
   { value: "outro", label: "Outro" },
 ];
 
@@ -47,6 +48,7 @@ export const SERVICE_TEMPLATES: Record<string, ServiceSeed[]> = {
     { name: "Aula experimental", durationMin: 60, priceCents: 0 },
     { name: "Aula avulsa", durationMin: 60, priceCents: 6000 },
   ],
+  servicos: [{ name: "Reunião de diagnóstico", durationMin: 60, priceCents: null }],
   outro: [{ name: "Atendimento", durationMin: 60, priceCents: null, priceNote: "sob consulta" }],
 };
 

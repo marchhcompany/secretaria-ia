@@ -1,0 +1,1 @@
+ALTER TABLE "businesses" ADD COLUMN "split_replies" boolean DEFAULT true NOT NULL;
