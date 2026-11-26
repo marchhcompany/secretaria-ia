@@ -11,7 +11,7 @@ de IA de cada empresa e conversa a partir da primeira mensagem.
 | Preço Claude Sonnet 5.5 | US$ 2 / 10; cache lido US$ 0,10 | Confirmado |
 | Preço Claude Haiku 5.5 | US$ 0,10 / 0,50 (até 100 mil tokens por pedido) | Confirmado |
 | WhatsApp Brasil · marketing | R$ 0,3217 por mensagem | Estimado a partir de fontes secundárias, **confirmar na Meta** |
-| WhatsApp Brasil · utilidade, autenticação e atendimento | R$ 0,035 por mensagem; 1.000 de atendimento grátis por número/mês | **Confirmar na Meta** (mudança de 01/10/2026) |
+| WhatsApp Brasil · utilidade, autenticação e atendimento | Atendimento cobrado desde 01/10/2026, mesma tarifa de utilidade; 1.000 grátis por número/mês | **Confirmado (Meta)**. Tarifa citada pela Meta: US$ 0,0068 (01/07/2026); valor em reais de out/2026 a conferir na planilha oficial |
 | Vercel Pro (uso comercial) | US$ 20/mês por membro | Preço público; o plano Hobby não permite uso comercial |
 | Banco Postgres gerenciado | US$ 0–25/mês (Neon/Supabase, plano gratuito ou Pro) | Depende do plano atual (não tive acesso) |
 | E-mail (Resend) | Grátis até 3.000 e-mails/mês | Preço público |

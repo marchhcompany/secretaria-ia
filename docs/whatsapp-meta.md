@@ -29,20 +29,21 @@ que só deve ser feita com sua autorização explícita.
 - **Janela de atendimento (24 h)**: depois de cada mensagem do cliente, o negócio pode responder com texto livre por 24 h. Fora dela, só
   **templates aprovados** (marketing, utilidade ou autenticação). A March Assistente bloqueia texto livre fora da janela.
 
-## Preços (Brasil): NÃO CONFIRMADOS por fonte oficial
+## Preços: CONFIRMADO na página oficial da Meta (lida em 26/11/2026)
 
-Os itens abaixo vêm de resultados de busca que citam a página de preços da Meta e de blogs de parceiros. Não consegui abrir a página
-oficial. **Não use estes valores em proposta comercial antes de conferir no Gerenciador do WhatsApp.** Segundo essas fontes, a partir de **01/10/2026**:
+Fonte: developers.facebook.com/documentation/business-messaging/whatsapp/pricing e .../pricing/non-template-messages.
 
-- Marketing: **R$ 0,3217** por mensagem entregue.
-- Utilidade e autenticação: **R$ 0,035**.
-- Atendimento (respostas de texto livre dentro da janela): **R$ 0,035**, com **1.000 grátis por número por mês**. Antes de out/2026 eram grátis.
-- Utilidade dentro da janela, que era grátis, também passou a ser cobrada.
-- Conversas iniciadas por anúncio "clique para WhatsApp" ou botão de chamada (Free Entry Point) abrem uma janela gratuita de 72 h.
-- Cobrança em reais disponível para o Brasil; empresas elegíveis migram para BRL até 30/06/2027.
-
-Este é o item que mais afeta a margem (ver `custos.md`). A página de marketing do WhatsApp ainda diz que atendimento é grátis: está
-desatualizada em relação à documentação de desenvolvedores, por isso **confirme no Gerenciador do WhatsApp** antes de fechar preço com clientes.
+- Desde **01/10/2026**, a Meta cobra **cada mensagem de atendimento** (texto livre respondendo ao cliente dentro da janela de 24 h),
+  inclusive as geradas por IA de terceiros como a nossa. Antes, eram grátis desde 01/11/2024.
+- **1.000 mensagens de atendimento grátis por número por mês** (não acumulam; renovam todo mês). Cobra a partir da 1.001ª.
+- A tarifa de atendimento é **igual à de utilidade/autenticação** de cada país. A Meta cita **US$ 0,0068 por mensagem no Brasil**
+  (tarifa de utilidade em vigor em 01/07/2026). Os valores de 01/10/2026 estão nas planilhas CSV/PDF da página (há tabela em **BRL**),
+  que não consegui extrair: **confirmar o valor exato em reais** lá ou no Gerenciador do WhatsApp.
+- Utilidade enviada dentro da janela também passou a ser cobrada (desde 01/10/2026).
+- Só cobra mensagem **entregue**. Conversas iniciadas por anúncio "clique para WhatsApp" abrem uma janela gratuita (Free Entry Point).
+- **Atenção:** sem **forma de pagamento cadastrada** na conta, a Meta **para de entregar mensagens de atendimento**. Cadastrar antes
+  da validação real (Business Settings → Billing → Payment methods).
+- Marketing: não extraí o valor oficial do Brasil (o número R$ 0,3217 da versão anterior deste documento vem de fonte secundária).
 
 ## Política de IA da Meta
 
@@ -59,14 +60,14 @@ assistente ao negócio de cada cliente. Há investigações de órgãos de conco
 
 ## Opção A · Número de teste da Meta (guia prático)
 
-> Os nomes de botões abaixo seguem a interface da Meta como eu a conheço; a documentação oficial estava bloqueada neste ambiente, então
-> **os rótulos exatos não foram confirmados** e podem estar em português ou inglês, com pequenas diferenças. A sequência é a mesma.
+> Sequência e rótulos conferidos no guia oficial "Get started" da Cloud API (26/11/2026). A interface pode estar em português; os nomes
+> em inglês entre aspas são os da documentação. Na documentação nova, a "WABA" aparece como **Messaging account**.
 
 ### Credenciais: teste x produção
 
 | Credencial | Para que serve | Teste (hoje) | Produção |
 |---|---|---|---|
-| Token de acesso | Enviar mensagens | **Token temporário** da tela *Configuração da API* (expira em ~24 h) | **Token de usuário do sistema** (não expira), com `whatsapp_business_messaging` e `whatsapp_business_management` |
+| Token de acesso | Enviar mensagens | **Token temporário** ("Generate access token" em *API Setup*; a Meta diz que "expira rápido") | **Token de usuário do sistema**, com `business_management`, `whatsapp_business_messaging` e `whatsapp_business_management` |
 | Phone Number ID | Saber de qual número é cada mensagem | ID do número de teste | ID do número definitivo |
 | WABA ID | Templates e cobrança | WABA de teste criada pela Meta | WABA definitiva |
 | App Secret | Conferir a assinatura dos webhooks | O mesmo nos dois | O mesmo |
@@ -93,7 +94,7 @@ O token temporário serve para o primeiro teste. Para a demonstração à WS, tr
 10. No painel da March Assistente → *Assistente → WhatsApp*: preencha o Phone Number ID e o WABA ID → *Salvar WhatsApp*.
 11. Produção: business.facebook.com → **Configurações do negócio → Usuários do sistema** → *Adicionar* (função Admin) → *Atribuir
     ativos*: o app e a WABA, com controle total → **Gerar novo token** → app "March Assistente", validade *Nunca*, permissões
-    `whatsapp_business_messaging` e `whatsapp_business_management` → copie direto para `WHATSAPP_ACCESS_TOKEN` na Vercel e faça redeploy.
+    `business_management`, `whatsapp_business_messaging` e `whatsapp_business_management` → copie direto para `WHATSAPP_ACCESS_TOKEN` na Vercel e faça redeploy.
 12. Do seu celular, mande "Oi" para o número de teste. A resposta da assistente deve chegar e aparecer no painel como *entregue/lida*.
 
 Validação de verdade = a resposta chega no celular **e** o painel mostra o status *entregue/lida* vindo do webhook da Meta. Um 200 na
@@ -101,10 +102,9 @@ requisição não basta.
 
 ### Não confirmado (documentação oficial inacessível neste ambiente)
 
-- Rótulos exatos dos botões e o limite exato de destinatários do número de teste.
-- Se as mensagens do número de teste são gratuitas.
-- Os preços por categoria no Brasil (seção "Preços" acima) e a cobrança de mensagens de atendimento desde 01/10/2026.
-- Todas as regras de coexistência (opção C), inclusive disponibilidade no Brasil.
+- Quantos destinatários o número de teste aceita e se as mensagens dele são cobradas (não consta na página lida).
+- O valor exato em reais da tarifa de atendimento/utilidade de 01/10/2026 (está em planilha na página oficial).
+- Lista de países da coexistência.
 
 ## Opção B · Número novo dedicado (recomendado para a demonstração)
 
@@ -115,10 +115,21 @@ requisição não basta.
 5. Inicie a **verificação empresarial** do portfolio (CNPJ, comprovante, domínio marchcompany.com.br). Ela libera limites maiores e é pré-requisito para a opção C e para vender a clientes.
 6. Troque o Phone Number ID no painel. O número de teste pode continuar existindo.
 
-## Opção C · Coexistência com o WhatsApp Business do celular (regras NÃO CONFIRMADAS por fonte oficial)
+## Opção C · Coexistência com o WhatsApp Business do celular
 
-Permite usar a API e o app **no mesmo número**, mantendo o app e o histórico. O que aparece em trechos de busca da página da Meta e em
-documentação de parceiros (360dialog, Telnyx); trate tudo como **a confirmar**:
+**Confirmado na página oficial** (".../embedded-signup/onboarding-business-app-users", lida em 26/11/2026):
+
+- Só pode ser feito por quem **já é Solution Partner ou Tech Provider** da Meta, via Embedded Signup. A March, hoje, não é: para usar
+  coexistência no próprio número precisaria virar Tech Provider ou usar um parceiro.
+- App WhatsApp Business **2.24.17** ou superior. Vazão fixa de **20 mensagens/segundo**.
+- Sincroniza conversas individuais dos **últimos 6 meses** (se a empresa autorizar); **grupos não sincronizam**. O histórico precisa ser
+  sincronizado em até 24 h depois do onboarding.
+- **Mensagens temporárias são desligadas** e **listas de transmissão ficam desativadas** (as existentes viram só leitura).
+- Todos os **aparelhos vinculados são desconectados** e podem ser reconectados; **WhatsApp para Windows** e WearOS não são suportados.
+- Webhooks: `history`, `smb_app_state_sync` e `smb_message_echoes` (mensagens enviadas pelo app do celular).
+
+Não encontrei na página uma lista de países (não confirmado se o Brasil tem alguma restrição). Os itens abaixo vêm de parceiros e
+continuam **a confirmar**:
 
 - É feito pelo **Embedded Signup** com a opção de coexistência (ou seja, por um app de **Tech Provider** ou por um **parceiro BSP**).
   Não há confirmação oficial de que uma empresa consiga fazer isso sozinha com o próprio app sem ser Tech Provider **(confirmar)**.

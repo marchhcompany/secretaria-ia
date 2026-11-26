@@ -6,10 +6,14 @@
   `claude-haiku-5-5` US$ 0,10/0,50, `claude-sonnet-5-5` US$ 2/10, `claude-opus-5-5` US$ 4/20 por milhão de tokens (entrada/saída);
   leitura de cache US$ 0,01 / 0,10 / 0,20. O Haiku 5.5 cobra mais caro (US$ 0,50/2,50) em pedidos acima de 100 mil tokens, o que não
   acontece no nosso uso (~6 mil tokens por chamada). Não há camada gratuita permanente: só créditos iniciais para teste.
-- **OpenAI, Google Gemini, Groq e OpenRouter: NÃO confirmados.** Os sites oficiais (platform.openai.com, ai.google.dev, groq.com,
+- **OpenRouter: confirmado na página oficial** (openrouter.ai/pricing): cobra o preço de tabela de cada provedor, mais **5,5%** na
+  compra de créditos (plano Standard; 8% no Business). Modelos grátis: 50 pedidos/dia, ou 1.000/dia depois de comprar US$ 10 em créditos.
+- **OpenAI, Google Gemini e Groq: NÃO confirmados.** Os sites oficiais (platform.openai.com, ai.google.dev, groq.com,
   openrouter.ai) estão bloqueados na rede deste ambiente. Os valores abaixo vêm de buscas em fontes secundárias de nov/2026 e
   **precisam ser conferidos** antes de qualquer decisão. As fontes divergiam sobre modelos mais novos (Gemini 3.x, GPT-5.4/6); usei só
-  os modelos em que as fontes concordavam.
+  os modelos em que as fontes concordavam. A página da OpenAI cita um modelo "gpt-5-6", sinal de que `gpt-5-mini` pode não ser
+  mais o modelo pequeno atual; os sites oficiais de preço da OpenAI e do Gemini redirecionam para `developers.openai.com` e
+  `aistudio.google.com`, que ainda não estão liberados neste ambiente.
 
 ## Comparação
 
@@ -26,7 +30,7 @@ Custo por atendimento = uma conversa com 6 mensagens do cliente (~8 chamadas, ~5
 | Google · Gemini 2.5 Flash | 0,30 / 2,50 | Secundária | R$ 0,10 | R$ 52 | Sim | Sim | Sim, mas os dados podem ser usados pelo Google |
 | Google · Gemini 2.5 Flash-Lite | 0,10 / 0,40 | Secundária | R$ 0,03 | R$ 14 | Sim | Sim | Sim, idem |
 | Groq · GPT-OSS 120B | 0,15 / 0,60 | Secundária | R$ 0,04 | R$ 17 | Sim | Parcial | Sim, com limites baixos (~1.000 pedidos/dia) |
-| OpenRouter · qualquer um acima | preço do provedor + ~5,5% na compra de créditos | Secundária | idem + 5,5% | idem | Depende do modelo | Depende do modelo | Modelos grátis: 50 pedidos/dia (1.000 com US$ 10 de créditos) |
+| OpenRouter · qualquer um acima | preço do provedor + 5,5% na compra de créditos | **Oficial** | idem + 5,5% | idem | Depende do modelo | Depende do modelo | Modelos grátis: 50 pedidos/dia (1.000 com US$ 10 de créditos) |
 
 Critérios que **não medi** e por isso não aparecem como fatos:
 
